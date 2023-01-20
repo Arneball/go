@@ -127,6 +127,13 @@ import (
 // correctly handles the case when only one of its arguments has a monotonic
 // clock reading.
 type Time struct {
+	// loc specifies the Location that should be used to
+	// determine the minute, hour, month, day, and year
+	// that correspond to this Time.
+	// The nil location means UTC.
+	// All UTC times are represented with loc==nil, never loc==&utcLoc.
+	loc *Location
+
 	// wall and ext encode the wall time seconds, wall time nanoseconds,
 	// and optional monotonic clock reading in nanoseconds.
 	//
@@ -140,13 +147,6 @@ type Time struct {
 	// signed 64-bit monotonic clock reading, nanoseconds since process start.
 	wall uint64
 	ext  int64
-
-	// loc specifies the Location that should be used to
-	// determine the minute, hour, month, day, and year
-	// that correspond to this Time.
-	// The nil location means UTC.
-	// All UTC times are represented with loc==nil, never loc==&utcLoc.
-	loc *Location
 }
 
 const (
@@ -912,7 +912,7 @@ func Since(t Time) Duration {
 	var now Time
 	if t.wall&hasMonotonic != 0 {
 		// Common case optimization: if t has monotonic time, then Sub will use only it.
-		now = Time{hasMonotonic, runtimeNano() - startNano, nil}
+		now = Time{nil, hasMonotonic, runtimeNano() - startNano}
 	} else {
 		now = Now()
 	}
@@ -925,7 +925,7 @@ func Until(t Time) Duration {
 	var now Time
 	if t.wall&hasMonotonic != 0 {
 		// Common case optimization: if t has monotonic time, then Sub will use only it.
-		now = Time{hasMonotonic, runtimeNano() - startNano, nil}
+		now = Time{nil, hasMonotonic, runtimeNano() - startNano}
 	} else {
 		now = Now()
 	}
@@ -1115,13 +1115,13 @@ func Now() Time {
 		// Seconds field overflowed the 33 bits available when
 		// storing a monotonic time. This will be true after
 		// March 16, 2157.
-		return Time{uint64(nsec), sec + minWall, Local}
+		return Time{Local, uint64(nsec), sec + minWall}
 	}
-	return Time{hasMonotonic | uint64(sec)<<nsecShift | uint64(nsec), mono, Local}
+	return Time{Local, hasMonotonic | uint64(sec)<<nsecShift | uint64(nsec), mono}
 }
 
 func unixTime(sec int64, nsec int32) Time {
-	return Time{uint64(nsec), sec + unixToInternal, Local}
+	return Time{Local, uint64(nsec), sec + unixToInternal}
 }
 
 // UTC returns t with the location set to UTC.
